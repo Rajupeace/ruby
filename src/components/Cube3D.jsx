@@ -25,12 +25,10 @@ const createCubieGroup = (x, y, z, initialState) => {
 
     // Thin rounded box with safe bevel radius (0.008 < 0.02 / 2) to prevent normal/shading glitches
     const stickerGeo = new RoundedBoxGeometry(0.78, 0.78, 0.02, 3, 0.008);
-    const stickerMat = new THREE.MeshStandardMaterial({
-      color: colStr,
-      roughness: 0.85, // Matte vinyl sticker texture to eliminate glares and environment reflections
-      metalness: 0.0,
-      emissive: colStr,
-      emissiveIntensity: 0.15 // Emissive intensity boosted to ensure color stays true and solid in all angles
+    // Use MeshBasicMaterial for the stickers so they render flat, solid, true colors
+    // that never shade, turn dark, or reflect splotches when rotated!
+    const stickerMat = new THREE.MeshBasicMaterial({
+      color: colStr
     });
     
     const stickerMesh = new THREE.Mesh(stickerGeo, stickerMat);
