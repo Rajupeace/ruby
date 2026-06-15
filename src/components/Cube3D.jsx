@@ -156,10 +156,19 @@ const Cube3D = ({ initialState, moveSequence, currentMoveIndex, isSolving, onMov
 
   }, [currentMoveIndex, isSolving, moveSequence]);
 
-  const easeOutBack = (x) => {
-    const c1 = 1.70158;
-    const c3 = c1 + 1;
-    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+  // Professional Speedcube Magnetic Snap Easing
+  const magneticSnapEase = (x) => {
+    if (x < 0.82) {
+      // Smooth cubic acceleration up to 82% of the turn
+      const u = x / 0.82;
+      return 0.82 * (3 * u * u - 2 * u * u * u);
+    } else {
+      // Satisfying magnetic pull: quick snap and a decaying micro-bounce to simulate physics click
+      const u = (x - 0.82) / 0.18;
+      const decay = Math.exp(-3.5 * u);
+      const wave = Math.cos(3 * Math.PI * u); // 1.5 cycles of high-frequency bounce
+      return 0.82 + 0.18 * (1 - decay * wave);
+    }
   };
 
   useFrame((state, delta) => {
@@ -169,7 +178,7 @@ const Cube3D = ({ initialState, moveSequence, currentMoveIndex, isSolving, onMov
     currentRotationRef.current += delta / 0.79;
     let progress = Math.min(currentRotationRef.current, 1);
     
-    let easedProgress = easeOutBack(progress);
+    let easedProgress = magneticSnapEase(progress);
     let currentAngle = targetRotationRef.current * easedProgress;
 
     if (axisRef.current.x) pivotRef.current.rotation.x = currentAngle;
