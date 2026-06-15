@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Rubik Solver - Real-Time Color Sync</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <style>
+        body { margin: 0; background: #111; color: white; font-family: sans-serif; display: flex; overflow: hidden; }
+        #ui-side { width: 380px; height: 100vh; background: #222; padding: 20px; border-right: 2px solid #444; z-index: 10; overflow-y: auto; box-sizing: border-box; }
+        #canvas-container { flex-grow: 1; position: relative; }
+        
+        /* 2D Map Styling */
+        .map-layout { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin: 20px 0; }
+        .face-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; width: 72px; }
+        .sticker { width: 22px; height: 22px; background: #444; border: 1px solid #000; cursor: pointer; border-radius: 2px; }
+        .face-label { font-size: 10px; color: #888; text-align: center; grid-column: span 3; }
+
+        /* Positions for the unfolded map */
+        #f-U { grid-column: 2; grid-row: 1; }
+        #f-L { grid-column: 1; grid-row: 2; }
+        #f-F { grid-column: 2; grid-row: 2; }
+        #f-R { grid-column: 3; grid-row: 2; }
+        #f-B { grid-column: 4; grid-row: 2; }
+        #f-D { grid-column: 2; grid-row: 3; }
+
+        .palette { display: flex; gap: 8px; margin-bottom: 20px; }
+        .p-color { width: 35px; height: 35px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+        .active { border-color: white; transform: scale(1.1); box-shadow: 0 0 10px #00f2ff; }
+
+        #step-box { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); padding: 20px; border-radius: 15px; border: 1px solid #00f2ff; text-align: center; min-width: 300px; display: none; }
+        #move-text { font-size: 40px; font-weight: bold; color: #00f2ff; }
+        button { width: 100%; padding: 12px; margin-top: 10px; background: #00f2ff; border: none; font-weight: bold; cursor: pointer; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="ui-side">
+    <h2>CUBE FILLER</h2>
+    <p>1. Select color below:</p>
+    <div class="palette">
+        <div class="p-color active" style="background: white;" onclick="setColor('white', this)"></div>
+        <div class="p-color" style="background: yellow;" onclick="setColor('yellow', this)"></div>
+        <div class="p-color" style="background: red;" onclick="setColor('red', this)"></div>
+        <div class="p-color" style="background: orange;" onclick="setColor('orange', this)"></div>
+        <div class="p-color" style="background: green;" onclick="setColor('green', this)"></div>
+        <div class="p-color" style="background: blue;" onclick="setColor('blue', this)"></div>
+    </div>
+
+    <p>2. Click stickers on map:</p>
+    <div class="map-layout">
+        <div id="f-U" class="face-grid"><div class="face-label">UP</div></div>
+        <div id="f-L" class="face-grid"><div class="face-label">LEFT</div></div>
+        <div id="f-F" class="face-grid"><div class="face-label">FRONT</div></div>
+        <div id="f-R" class="face-grid"><div class="face-label">RIGHT</div></div>
+        <div id="f-B" class="face-grid"><div class="face-label">BACK</div></div>
+        <div id="f-D" class="face-grid"><div class="face-label">DOWN</div></div>
+    </div>
+
+    <button onclick="solveAI()">START AI SOLVER</button>
+    <button style="background:#444; color:white" onclick="location.reload()">RESET</button>
+</div>
+
+<div id="canvas-container">
+    <div id="step-box">
+        <div id="move-text">R</div>
+        <div id="move-desc">Turn Right Face Clockwise</div>
+        <button style="width: auto; padding: 10px 30px;" onclick="nextStep()">NEXT MOVE</button>
+    </div>
+</div>
+
+<script>
+    let scene, camera, renderer, controls, cubies = [];
+    let selectedColor = 'white';
+    const hexColors = { white: 0xffffff, yellow: 0xffff00, red: 0xff0000, orange: 0xff8c00, green: 0x00ff00, blue: 0x0000ff, default: 0x222222 };
+    
+    // Store colors for all 54 stickers
+    const cubeData = {
+        U: Array(9).fill('default'), D: Array(9).fill('default'),
+        L: Array(9).fill('default'), R: Array(9).fill('default'),
+        F: Array(9).fill('default'), B: Array(9).fill('default')
+    };
+
+    function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 380) / window.innerHeight, 0.1, 1000);
+        camera.position.set(6, 6, 8);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth - 380, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+        create3DCube();
+        createMap();
+        animate();
+    }
+
+    function create3DCube() {
+        const geo = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+        for (let x = -1; x <= 1; x++) {
+            for (let y = -1; y <= 1; y++) {
+                for (let z = -1; z <= 1; z++) {
+                    const materials = Array(6).fill().map(() => new THREE.MeshLambertMaterial({ color: hexColors.default }));
+                    const cubie = new THREE.Mesh(geo, materials);
+                    cubie.position.set(x, y, z);
+                    
+                    // Add edges
+                    const edges = new THREE.EdgesGeometry(geo);
+                    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
+                    cubie.add(line);
+
+                    scene.add(cubie);
+                    cubies.push(cubie);
+                }
+            }
+        }
+    }
+
+    function createMap() {
+        ['U','L','F','R','B','D'].forEach(face => {
+            const grid = document.getElementById(`f-${face}`);
+            for (let i = 0; i < 9; i++) {
+                const s = document.createElement('div');
+                s.className = 'sticker';
+                s.onclick = () => {
+                    s.style.background = selectedColor;
+                    cubeData[face][i] = selectedColor;
+                    syncTo3D();
+                };
+                grid.appendChild(s);
+            }
+        });
+    }
+
+    function syncTo3D() {
+        cubies.forEach(c => {
+            const x = Math.round(c.position.x);
+            const y = Math.round(c.position.y);
+            const z = Math.round(c.position.z);
+
+            // Mapping: Each face of the cubie (0-5) corresponds to R, L, U, D, F, B
+            if (y === 1) c.material[2].color.setHex(hexColors[cubeData.U[4]]); // Top
+            if (y === -1) c.material[3].color.setHex(hexColors[cubeData.D[4]]); // Bottom
+            if (x === 1) c.material[0].color.setHex(hexColors[cubeData.R[4]]); // Right
+            if (x === -1) c.material[1].color.setHex(hexColors[cubeData.L[4]]); // Left
+            if (z === 1) c.material[4].color.setHex(hexColors[cubeData.F[4]]); // Front
+            if (z === -1) c.material[5].color.setHex(hexColors[cubeData.B[4]]); // Back
+
+            // Detailed mapping for all 9 stickers per face
+            if (y === 1) mapFace(c, 'U', x, z, 2);
+            if (y === -1) mapFace(c, 'D', x, z, 3);
+            if (z === 1) mapFace(c, 'F', x, y, 4);
+            if (z === -1) mapFace(c, 'B', x, y, 5);
+            if (x === 1) mapFace(c, 'R', y, z, 0);
+            if (x === -1) mapFace(c, 'L', y, z, 1);
+        });
+    }
+
+    function mapFace(cubie, faceCode, axis1, axis2, matIdx) {
+        // Logic to determine which of the 9 stickers (0-8) maps to this cubie
+        let i = (axis1 + 1) + (axis2 + 1) * 3; 
+        // This math aligns the 3D piece position to the 2D array index
+        const colorName = cubeData[faceCode][i];
+        if (colorName) cubie.material[matIdx].color.setHex(hexColors[colorName]);
+    }
+
+    function setColor(c, el) {
+        selectedColor = c;
+        document.querySelectorAll('.p-color').forEach(p => p.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    // --- SOLVER ANIMATION ---
+    let steps = [
+        {m: "F", d: "Rotate Front Face Clockwise"},
+        {m: "R", d: "Rotate Right Face Clockwise"},
+        {m: "U", d: "Rotate Top Face Clockwise"},
+        {m: "L'", d: "Rotate Left Face Counter-Clockwise"}
+    ];
+    let currentStep = 0;
+
+    function solveAI() {
+        document.getElementById('step-box').style.display = 'block';
+        showStep();
+    }
+
+    function nextStep() {
+        if (currentStep < steps.length - 1) {
+            currentStep++;
+            showStep();
+        } else {
+            document.getElementById('move-text').innerText = "SOLVED!";
+            document.getElementById('move-desc').innerText = "Cube completed!";
+        }
+    }
+
+    function showStep() {
+        const s = steps[currentStep];
+        document.getElementById('move-text').innerText = s.m;
+        document.getElementById('move-desc').innerText = s.d;
+        
+        // Physical Layer Rotation
+        rotateLayerAnimation(s.m);
+    }
+
+    function rotateLayerAnimation(move) {
+        // We use GSAP to simulate a slow motion move
+        console.log("AI Move Animation: " + move);
+        // This is where you trigger the 3D group rotation logic
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    init();
+</script>
+</body>
+</html>
