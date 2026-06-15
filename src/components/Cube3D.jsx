@@ -23,14 +23,14 @@ const createCubieGroup = (x, y, z, initialState) => {
     const colStr = COLORS[colorName];
     if (!colStr || colStr === COLORS.default) return;
 
-    // Thin rounded box for realistic sticker depth
-    const stickerGeo = new RoundedBoxGeometry(0.78, 0.78, 0.015, 3, 0.04);
+    // Thin rounded box with safe bevel radius (0.008 < 0.02 / 2) to prevent normal/shading glitches
+    const stickerGeo = new RoundedBoxGeometry(0.78, 0.78, 0.02, 3, 0.008);
     const stickerMat = new THREE.MeshStandardMaterial({
       color: colStr,
-      roughness: 0.25, // semi-glossy real vinyl sticker feel
+      roughness: 0.85, // Matte vinyl sticker texture to eliminate glares and environment reflections
       metalness: 0.0,
       emissive: colStr,
-      emissiveIntensity: 0.08 // Tiny emissive hint so colors stay vivid under shadow
+      emissiveIntensity: 0.15 // Emissive intensity boosted to ensure color stays true and solid in all angles
     });
     
     const stickerMesh = new THREE.Mesh(stickerGeo, stickerMat);
@@ -39,14 +39,14 @@ const createCubieGroup = (x, y, z, initialState) => {
     group.add(stickerMesh);
   };
 
-  // Add stickers to outer faces offset by 0.485 (half of 0.96 plus half of 0.015 sticker thickness)
+  // Add stickers to outer faces offset by 0.49 (half of 0.96 body plus half of 0.02 sticker thickness)
   // This aligns them perfectly on the surface with realistic black borders!
-  if (x === 1)  addSticker(0.485, 0, 0, 0, Math.PI / 2, 0, initialState.R[getFaceIndex('R', x, y, z)]);
-  if (x === -1) addSticker(-0.485, 0, 0, 0, -Math.PI / 2, 0, initialState.L[getFaceIndex('L', x, y, z)]);
-  if (y === 1)  addSticker(0, 0.485, 0, -Math.PI / 2, 0, 0, initialState.U[getFaceIndex('U', x, y, z)]);
-  if (y === -1) addSticker(0, -0.485, 0, Math.PI / 2, 0, 0, initialState.D[getFaceIndex('D', x, y, z)]);
-  if (z === 1)  addSticker(0, 0, 0.485, 0, 0, 0, initialState.F[getFaceIndex('F', x, y, z)]);
-  if (z === -1) addSticker(0, 0, -0.485, 0, Math.PI, 0, initialState.B[getFaceIndex('B', x, y, z)]);
+  if (x === 1)  addSticker(0.49, 0, 0, 0, Math.PI / 2, 0, initialState.R[getFaceIndex('R', x, y, z)]);
+  if (x === -1) addSticker(-0.49, 0, 0, 0, -Math.PI / 2, 0, initialState.L[getFaceIndex('L', x, y, z)]);
+  if (y === 1)  addSticker(0, 0.49, 0, -Math.PI / 2, 0, 0, initialState.U[getFaceIndex('U', x, y, z)]);
+  if (y === -1) addSticker(0, -0.49, 0, Math.PI / 2, 0, 0, initialState.D[getFaceIndex('D', x, y, z)]);
+  if (z === 1)  addSticker(0, 0, 0.49, 0, 0, 0, initialState.F[getFaceIndex('F', x, y, z)]);
+  if (z === -1) addSticker(0, 0, -0.49, 0, Math.PI, 0, initialState.B[getFaceIndex('B', x, y, z)]);
 
   return group;
 };

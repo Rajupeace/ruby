@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, ContactShadows } from '@react-three/drei';
+import { OrbitControls, ContactShadows } from '@react-three/drei';
 import SidebarUI from './components/SidebarUI';
 import Cube3D from './components/Cube3D';
 import CameraScanner from './components/CameraScanner';
@@ -148,7 +148,6 @@ function App() {
           <ambientLight intensity={0.85} />
           <spotLight position={[10, 15, 10]} angle={0.3} penumbra={1} intensity={2.2} castShadow />
           <spotLight position={[-8, 10, -5]} angle={0.4} penumbra={0.5} intensity={0.5} color="#e4efff" />
-          <Environment preset="city" />
           <ContactShadows resolution={512} scale={20} blur={2.5} opacity={0.4} far={10} color="#000000" position={[0, -2.5, 0]} />
           <Cube3D 
             key={isSolving ? "solving" : JSON.stringify(cubeState)}
