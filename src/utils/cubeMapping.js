@@ -1,12 +1,13 @@
 export const COLORS = {
   white: '#ffffff',
-  yellow: '#ffeb3b', // Bright speedcube fluorescent yellow
-  red: '#e53935',    // RichSpeedcube Red
-  orange: '#ff6d00', // Deep speedcube orange
-  green: '#00c853',  // Vibrant Speedcube Green (emerald)
-  blue: '#0070f3',   // Electric Speedcube Blue (Vercel style)
-  default: '#121319' // Textured obsidian/charcoal black body
+  yellow: '#ffdd00',
+  red: '#ff0000',
+  orange: '#ff8c00',
+  green: '#00cc00',
+  blue: '#0066ff',
+  default: '#2a2a2a'
 };
+
 
 // Standard face-to-color mapping for center pieces
 export const FACE_COLORS = {

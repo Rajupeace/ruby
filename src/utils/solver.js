@@ -109,12 +109,12 @@ export const solveCubeLocal = async (cubeState) => {
       }
     }
 
-    console.log('[Solver] State string:', stateString);
+
 
     const solverFn = await getSolverFunction();
     const rawSolution = solverFn(stateString);
     
-    console.log('[Solver] Raw solution:', rawSolution);
+
     
     if (!rawSolution || rawSolution.trim() === '') {
       return { moves: [], message: 'Cube is already solved!' };
@@ -125,7 +125,6 @@ export const solveCubeLocal = async (cubeState) => {
       return normalized;
     });
 
-    console.log('[Solver] Parsed moves:', moves);
     return { moves };
   } catch (err) {
     console.error('[Solver] Error:', err);
@@ -143,38 +142,107 @@ const FACE_NAMES = {
   'M': 'Middle (↕)', 'E': 'Equator (↔)', 'S': 'Standing (↗)',
 };
 
-export const getMoveDescription = (move) => {
-  if (!move) return { face: '?', direction: '', explain: '' };
+const MOVE_EXPLANATIONS = {
+  'R': { explain: 'Rotate right face clockwise - Hold cube with right face toward you, turn it away', tip: 'Use your right hand to turn the right face away from you' },
+  "R'": { explain: 'Rotate right face counter-clockwise - Hold cube with right face toward you, turn it toward you', tip: 'Use your right hand to turn the right face toward you' },
+  'R2': { explain: 'Rotate right face 180° - Double turn of right face', tip: 'Quick double turn with your right hand' },
+  'L': { explain: 'Rotate left face clockwise - Hold cube with left face toward you, turn it toward you', tip: 'Use your left hand to turn the left face toward you' },
+  "L'": { explain: 'Rotate left face counter-clockwise - Hold cube with left face toward you, turn it away', tip: 'Use your left hand to turn the left face away from you' },
+  'L2': { explain: 'Rotate left face 180° - Double turn of left face', tip: 'Quick double turn with your left hand' },
+  'U': { explain: 'Rotate top face clockwise - Turn the top layer to the left', tip: 'Use your right hand to turn the top face clockwise (away from you)' },
+  "U'": { explain: 'Rotate top face counter-clockwise - Turn the top layer to the right', tip: 'Use your right hand to turn the top face counter-clockwise (toward you)' },
+  'U2': { explain: 'Rotate top face 180° - Double turn of top face', tip: 'Quick double turn of the top face' },
+  'D': { explain: 'Rotate bottom face clockwise - Turn the bottom layer to the right', tip: 'Use your right hand to turn the bottom face clockwise' },
+  "D'": { explain: 'Rotate bottom face counter-clockwise - Turn the bottom layer to the left', tip: 'Use your right hand to turn the bottom face counter-clockwise' },
+  'D2': { explain: 'Rotate bottom face 180° - Double turn of bottom face', tip: 'Quick double turn of the bottom face' },
+  'F': { explain: 'Rotate front face clockwise - Turn the front face to the right', tip: 'Use your right hand to turn the front face clockwise' },
+  "F'": { explain: 'Rotate front face counter-clockwise - Turn the front face to the left', tip: 'Use your right hand to turn the front face counter-clockwise' },
+  'F2': { explain: 'Rotate front face 180° - Double turn of front face', tip: 'Quick double turn of the front face' },
+  'B': { explain: 'Rotate back face clockwise - Turn the back face to the left (from front view)', tip: 'Use your left hand to turn the back face' },
+  "B'": { explain: 'Rotate back face counter-clockwise - Turn the back face to the right (from front view)', tip: 'Use your left hand to turn the back face opposite direction' },
+  'B2': { explain: 'Rotate back face 180° - Double turn of back face', tip: 'Quick double turn of the back face' },
+};
+
+export const getMoveDescription = (move, phaseName = '') => {
+  if (!move) return { face: '?', direction: '', explain: '', tip: '' };
   
   const face = move[0];
   const isPrime = move.includes("'");
   const isDouble = move.includes("2");
   
-  const faceName = FACE_NAMES[face] || face;
-  let direction = isPrime ? 'Counter-Clockwise' : 'Clockwise';
-  if (isDouble) direction = '180° (Half Turn)';
+  let baseExplain = '';
+  let baseTip = '';
+  const moveKey = move;
+  
+  if (MOVE_EXPLANATIONS[moveKey]) {
+    baseExplain = MOVE_EXPLANATIONS[moveKey].explain;
+    baseTip = MOVE_EXPLANATIONS[moveKey].tip;
+  } else {
+    // Fallback to generic explanation
+    const faceName = FACE_NAMES[face] || face;
+    let direction = isPrime ? 'Counter-Clockwise' : 'Clockwise';
+    if (isDouble) direction = '180° (Half Turn)';
 
-  let emoji = '👉';
-  if (face === 'U' || face === 'u') emoji = '☝️';
-  if (face === 'D' || face === 'd') emoji = '👇';
-  if (face === 'L' || face === 'l') emoji = '👈';
-  if (face === 'R' || face === 'r') emoji = '👉';
-  if (face === 'F' || face === 'f') emoji = '🖐️';
-  if (face === 'B' || face === 'b') emoji = '✋';
-  if (face === 'M') emoji = '🔄';
-  if (face === 'E') emoji = '🔄';
-  if (face === 'S') emoji = '🔄';
-  
-  const explain = `${emoji} Rotate the ${faceName} face ${direction}`;
-  
-  return { face: faceName, direction, explain };
+    let emoji = '👉';
+    if (face === 'U' || face === 'u') emoji = '☝️';
+    if (face === 'D' || face === 'd') emoji = '👇';
+    if (face === 'L' || face === 'l') emoji = '👈';
+    if (face === 'R' || face === 'r') emoji = '👉';
+    if (face === 'F' || face === 'f') emoji = '🖐️';
+    if (face === 'B' || face === 'b') emoji = '✋';
+    if (face === 'M') emoji = '🔄';
+    if (face === 'E') emoji = '🔄';
+    if (face === 'S') emoji = '🔄';
+    
+    baseExplain = `${emoji} Rotate the ${faceName} face ${direction}`;
+    baseTip = 'Use appropriate hand to rotate this face';
+  }
+
+  // Dynamic Phase Explanation Injection
+  let dynamicExplain = baseExplain;
+  if (phaseName === 'Cross') {
+    dynamicExplain = `${baseExplain.split(' - ')[0]} - Moving edge piece to form the white cross`;
+  } else if (phaseName === 'F2L') {
+    dynamicExplain = `${baseExplain.split(' - ')[0]} - Inserting/Pairing F2L corner-edge pair`;
+  } else if (phaseName === 'OLL') {
+    dynamicExplain = `${baseExplain.split(' - ')[0]} - Executing OLL algorithm to orient yellow face`;
+  } else if (phaseName === 'PLL') {
+    dynamicExplain = `${baseExplain.split(' - ')[0]} - Executing PLL algorithm to position final pieces`;
+  }
+
+  return { 
+    face: FACE_NAMES[face] || face, 
+    direction: isPrime ? 'Counter-Clockwise' : isDouble ? '180°' : 'Clockwise', 
+    explain: dynamicExplain, 
+    tip: baseTip 
+  };
 };
 
 // Analyze where we are in the Fridrich method based on move index vs total
 export const getPhaseDescription = (moveIndex, totalMoves) => {
   const progress = moveIndex / totalMoves;
-  if (progress < 0.15) return { phase: 'Cross', desc: 'Building the white cross on top', color: '#45f3ff' };
-  if (progress < 0.45) return { phase: 'F2L', desc: 'First Two Layers — corners & edges', color: '#ff8800' };
-  if (progress < 0.70) return { phase: 'OLL', desc: 'Orient Last Layer — making top yellow', color: '#ffd500' };
-  return { phase: 'PLL', desc: 'Permute Last Layer — final arrangement!', color: '#00ff88' };
+  if (progress < 0.15) return { 
+    phase: 'Cross', 
+    desc: 'Building the white cross on top - positioning edge pieces', 
+    color: '#45f3ff',
+    tip: 'Focus on getting the white edges to match the center colors'
+  };
+  if (progress < 0.45) return { 
+    phase: 'F2L', 
+    desc: 'First Two Layers — inserting corner-edge pairs together', 
+    color: '#ff8800',
+    tip: 'Pair corners with edges and insert them into their slots'
+  };
+  if (progress < 0.70) return { 
+    phase: 'OLL', 
+    desc: 'Orient Last Layer — making the entire top face yellow', 
+    color: '#ffd500',
+    tip: 'Use algorithms to orient all yellow stickers to face up'
+  };
+  return { 
+    phase: 'PLL', 
+    desc: 'Permute Last Layer — final arrangement of pieces!', 
+    color: '#00ff88',
+    tip: 'Move pieces to their final solved positions'
+  };
 };
