@@ -114,10 +114,21 @@ export const solveCubeLocal = async (cubeState) => {
     const solverFn = await getSolverFunction();
     const rawSolution = solverFn(stateString);
     
+    // The library returns false or empty string for invalid/solved cubes.
+    // Let's verify if it's ACTUALLY solved.
+    const isSolved = stateString === 'fffffffffrrrrrrrrruuuuuuuuudddddddddlllllllllbbbbbbbbb' ||
+                     stateString === 'uuuuuuuuuurrrrrrrrrfffffffffdddddddddlllllllllbbbbbbbbb'; // some solvers use URFDLB
 
-    
-    if (!rawSolution || rawSolution.trim() === '') {
-      return { moves: [], message: 'Cube is already solved!' };
+    if (!rawSolution || (typeof rawSolution === 'string' && rawSolution.trim() === '')) {
+      if (isSolved) {
+        return { moves: [], message: 'Cube is already solved!' };
+      } else {
+        throw new Error("Invalid or Impossible Cube State! Please ensure you scanned the colors EXACTLY according to the 'How to hold' instructions. An impossible edge or corner piece was detected.");
+      }
+    }
+
+    if (typeof rawSolution !== 'string') {
+        throw new Error("Invalid or Impossible Cube State! Please ensure you scanned the colors EXACTLY according to the 'How to hold' instructions.");
     }
 
     const moves = rawSolution.split(' ').filter(m => m.trim().length > 0).map(m => {
