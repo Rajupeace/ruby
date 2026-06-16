@@ -168,6 +168,18 @@ const CameraScanner = ({ onCapture, onClose, currentFaceToCapture }) => {
     });
   };
 
+  const getHoldHint = () => {
+    switch(currentFaceToCapture) {
+      case 'U': return "Hold cube with Top (White) facing camera, and Back (Blue) pointing UP.";
+      case 'D': return "Hold cube with Bottom (Yellow) facing camera, and Front (Green) pointing UP.";
+      case 'F': return "Hold cube with Front (Green) facing camera, and Top (White) pointing UP.";
+      case 'B': return "Hold cube with Back (Blue) facing camera, and Top (White) pointing UP.";
+      case 'L': return "Hold cube with Left (Orange) facing camera, and Top (White) pointing UP.";
+      case 'R': return "Hold cube with Right (Red) facing camera, and Top (White) pointing UP.";
+      default: return "";
+    }
+  };
+
   return (
     <div className="camera-overlay">
       <div className="camera-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -177,6 +189,11 @@ const CameraScanner = ({ onCapture, onClose, currentFaceToCapture }) => {
             Scan Face {currentFaceToCapture} ({FACE_COLORS[currentFaceToCapture].toUpperCase()})
           </h3>
           <button onClick={onClose} className="icon-btn" style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}><X size={20}/></button>
+        </div>
+
+        <div style={{ width: '100%', padding: '12px', background: 'rgba(69, 243, 255, 0.1)', border: '1px solid rgba(69, 243, 255, 0.3)', borderRadius: '8px', marginBottom: '15px', color: '#45f3ff', fontSize: '0.85rem', lineHeight: '1.4', textAlign: 'center' }}>
+          <strong>💡 How to hold:</strong><br/>
+          {getHoldHint()}
         </div>
 
         {error && <div style={{ color: '#ffcc00', fontSize: '0.8rem', padding: '10px', background: 'rgba(255,200,0,0.1)', borderRadius: '8px', marginBottom: '10px', lineHeight: '1.4', maxWidth: '300px' }}>{error}</div>}
