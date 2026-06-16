@@ -89,6 +89,62 @@ export const validateCubeState = (cubeState) => {
     return { error: 'All 6 center pieces must have a unique color.' };
   }
 
+  // Check for impossible pieces (opposite colors on same piece, or duplicate colors)
+  const opposites = [
+    [cubeState.U[4], cubeState.D[4]],
+    [cubeState.L[4], cubeState.R[4]],
+    [cubeState.F[4], cubeState.B[4]]
+  ];
+
+  const isInvalidPair = (c1, c2) => {
+    if (c1 === c2) return true; // Duplicate colors on same piece
+    for (const [op1, op2] of opposites) {
+      if ((c1 === op1 && c2 === op2) || (c1 === op2 && c2 === op1)) return true;
+    }
+    return false;
+  };
+
+  // 12 Edges
+  const edges = [
+    { name: 'Top-Front', colors: [cubeState.U[7], cubeState.F[1]] },
+    { name: 'Top-Right', colors: [cubeState.U[5], cubeState.R[1]] },
+    { name: 'Top-Back', colors: [cubeState.U[1], cubeState.B[1]] },
+    { name: 'Top-Left', colors: [cubeState.U[3], cubeState.L[1]] },
+    { name: 'Bottom-Front', colors: [cubeState.D[1], cubeState.F[7]] },
+    { name: 'Bottom-Right', colors: [cubeState.D[5], cubeState.R[7]] },
+    { name: 'Bottom-Back', colors: [cubeState.D[7], cubeState.B[7]] },
+    { name: 'Bottom-Left', colors: [cubeState.D[3], cubeState.L[7]] },
+    { name: 'Front-Right', colors: [cubeState.F[5], cubeState.R[3]] },
+    { name: 'Front-Left', colors: [cubeState.F[3], cubeState.L[5]] },
+    { name: 'Back-Left', colors: [cubeState.B[5], cubeState.L[3]] },
+    { name: 'Back-Right', colors: [cubeState.B[3], cubeState.R[5]] }
+  ];
+
+  for (const edge of edges) {
+    if (isInvalidPair(edge.colors[0], edge.colors[1])) {
+      return { error: `Invalid Cube: The ${edge.name} edge has impossible colors (${edge.colors[0]} and ${edge.colors[1]}). Check your scan or manual color entry.` };
+    }
+  }
+
+  // 8 Corners
+  const corners = [
+    { name: 'Top-Front-Right', colors: [cubeState.U[8], cubeState.F[2], cubeState.R[0]] },
+    { name: 'Top-Front-Left', colors: [cubeState.U[6], cubeState.F[0], cubeState.L[2]] },
+    { name: 'Top-Back-Left', colors: [cubeState.U[0], cubeState.B[2], cubeState.L[0]] },
+    { name: 'Top-Back-Right', colors: [cubeState.U[2], cubeState.B[0], cubeState.R[2]] },
+    { name: 'Bottom-Front-Right', colors: [cubeState.D[2], cubeState.F[8], cubeState.R[6]] },
+    { name: 'Bottom-Front-Left', colors: [cubeState.D[0], cubeState.F[6], cubeState.L[8]] },
+    { name: 'Bottom-Back-Left', colors: [cubeState.D[6], cubeState.B[8], cubeState.L[6]] },
+    { name: 'Bottom-Back-Right', colors: [cubeState.D[8], cubeState.B[6], cubeState.R[8]] }
+  ];
+
+  for (const corner of corners) {
+    const c = corner.colors;
+    if (isInvalidPair(c[0], c[1]) || isInvalidPair(c[1], c[2]) || isInvalidPair(c[0], c[2])) {
+      return { error: `Invalid Cube: The ${corner.name} corner has impossible colors (${c[0]}, ${c[1]}, ${c[2]}). Check your scan or manual color entry.` };
+    }
+  }
+
   return { valid: true, colorToFace };
 };
 
