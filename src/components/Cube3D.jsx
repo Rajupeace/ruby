@@ -80,8 +80,53 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
   const cubiesRef = useRef([]);
   const pivotRef = useRef(new THREE.Group());
   const highlightGroupRef = useRef(new THREE.Group());
-  const { scene } = useThree();
+  const { scene, gl, camera } = useThree();
   
+  // Custom drag rotation
+  useEffect(() => {
+    let isDragging = false;
+    let previousPosition = { x: 0, y: 0 };
+
+    const onPointerDown = (e) => {
+      isDragging = true;
+      previousPosition = { x: e.clientX, y: e.clientY };
+    };
+
+    const onPointerMove = (e) => {
+      if (!isDragging || !groupRef.current) return;
+      
+      const deltaX = e.clientX - previousPosition.x;
+      const deltaY = e.clientY - previousPosition.y;
+      previousPosition = { x: e.clientX, y: e.clientY };
+
+      const rotationSpeed = 0.008;
+      groupRef.current.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), deltaX * rotationSpeed);
+      groupRef.current.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), deltaY * rotationSpeed);
+    };
+
+    const onPointerUp = () => {
+      isDragging = false;
+    };
+
+    const dom = gl.domElement;
+    // Passive false needed to allow preventing default if necessary, but pointer events are usually fine
+    dom.style.touchAction = 'none'; // Prevent browser scrolling while dragging cube
+    dom.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+
+    return () => {
+      dom.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
+  }, [gl]);
+  
+  // Initial camera setup
+  useEffect(() => {
+    camera.lookAt(0, 0, 0);
+  }, [camera]);
+
   // Animation state
   const targetRotationRef = useRef(0);
   const progressRef = useRef(0);
@@ -91,19 +136,19 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
 
   // Build the 27 cubies from cubeState
   useEffect(() => {
-    scene.add(pivotRef.current);
+    groupRef.current.add(pivotRef.current);
 
     // Cleanup old cubies
-    cubiesRef.current.forEach(c => scene.remove(c));
+    cubiesRef.current.forEach(c => groupRef.current.remove(c));
     cubiesRef.current = [];
 
     // Remove old highlight group
     if (highlightGroupRef.current) {
-      scene.remove(highlightGroupRef.current);
+      groupRef.current.remove(highlightGroupRef.current);
     }
     highlightGroupRef.current = new THREE.Group();
     highlightGroupRef.current.visible = false;
-    scene.add(highlightGroupRef.current);
+    groupRef.current.add(highlightGroupRef.current);
 
     const cubeSize = 0.96;
     const geo = new RoundedBoxGeometry(cubeSize, cubeSize, cubeSize, 4, 0.06);
@@ -145,7 +190,7 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
           if (z === 1) addSticker(new THREE.Vector3(0, 0, 1), 'F', 4);
           if (z === -1) addSticker(new THREE.Vector3(0, 0, -1), 'B', 5);
           
-          scene.add(mesh);
+          groupRef.current.add(mesh);
           cubiesRef.current.push(mesh);
         }
       }
@@ -156,10 +201,10 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
     progressRef.current = 0;
     
     return () => {
-      cubiesRef.current.forEach(c => scene.remove(c));
+      cubiesRef.current.forEach(c => groupRef.current.remove(c));
       cubiesRef.current = [];
-      if (highlightGroupRef.current) scene.remove(highlightGroupRef.current);
-      scene.remove(pivotRef.current);
+      if (highlightGroupRef.current) groupRef.current.remove(highlightGroupRef.current);
+      groupRef.current.remove(pivotRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rebuildKey]);
@@ -214,7 +259,7 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
 
     const childrenList = [...pivotRef.current.children];
     childrenList.forEach(child => {
-      scene.attach(child);
+      groupRef.current.attach(child);
       child.position.x = Math.round(child.position.x);
       child.position.y = Math.round(child.position.y);
       child.position.z = Math.round(child.position.z);
@@ -251,7 +296,7 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
       
       const children = [...pivotRef.current.children];
       children.forEach(child => {
-        scene.attach(child);
+        groupRef.current.attach(child);
         child.position.x = Math.round(child.position.x);
         child.position.y = Math.round(child.position.y);
         child.position.z = Math.round(child.position.z);
@@ -403,7 +448,7 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
       
       const children = [...pivotRef.current.children];
       children.forEach(child => {
-        scene.attach(child);
+        groupRef.current.attach(child);
         child.position.x = Math.round(child.position.x);
         child.position.y = Math.round(child.position.y);
         child.position.z = Math.round(child.position.z);
@@ -429,44 +474,43 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
     }
   });
 
-  // --- Auto-rotate camera to focused face ---
-  const targetCameraPosRef = useRef(null);
+  // --- Auto-rotate cube to present focused face ---
+  const targetCubeQuatRef = useRef(null);
   
   useEffect(() => {
     if (!focusedFace) {
-      targetCameraPosRef.current = null;
+      targetCubeQuatRef.current = null;
       return;
     }
     
-    // Calculate a nice viewing angle for each face, keeping some 3D perspective
-    const dist = 12;
-    const yOffset = 4;
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
     switch(focusedFace) {
-      case 'F': targetCameraPosRef.current = new THREE.Vector3(0, yOffset, dist); break;
-      case 'B': targetCameraPosRef.current = new THREE.Vector3(0, yOffset, -dist); break;
-      case 'R': targetCameraPosRef.current = new THREE.Vector3(dist, yOffset, 0); break;
-      case 'L': targetCameraPosRef.current = new THREE.Vector3(-dist, yOffset, 0); break;
-      case 'U': targetCameraPosRef.current = new THREE.Vector3(0, dist, yOffset); break;
-      case 'D': targetCameraPosRef.current = new THREE.Vector3(0, -dist, yOffset); break;
-      default: targetCameraPosRef.current = null;
+      case 'F': euler.set(0, 0, 0); break;
+      case 'R': euler.set(0, -Math.PI / 2, 0); break;
+      case 'B': euler.set(0, Math.PI, 0); break;
+      case 'L': euler.set(0, Math.PI / 2, 0); break;
+      case 'U': euler.set(Math.PI / 2, 0, 0); break;
+      case 'D': euler.set(-Math.PI / 2, 0, 0); break;
+      default: targetCubeQuatRef.current = null; return;
     }
+    targetCubeQuatRef.current = new THREE.Quaternion().setFromEuler(euler);
   }, [focusedFace]);
 
   useFrame((state, delta) => {
-    // Smoothly move camera if a face is focused and we aren't solving
-    if (targetCameraPosRef.current && !isSolving) {
-      state.camera.position.lerp(targetCameraPosRef.current, 0.08);
-      state.camera.lookAt(0, 0, 0);
-      // Stop forcing the camera once it arrives, giving control back to the user
-      if (state.camera.position.distanceTo(targetCameraPosRef.current) < 0.1) {
-        targetCameraPosRef.current = null;
+    // Smoothly rotate the cube if a face is focused and we aren't solving
+    if (targetCubeQuatRef.current && !isSolving && groupRef.current) {
+      groupRef.current.quaternion.slerp(targetCubeQuatRef.current, 0.1);
+      
+      // Stop forcing the rotation once it arrives, giving control back to the user
+      if (groupRef.current.quaternion.angleTo(targetCubeQuatRef.current) < 0.05) {
+        targetCubeQuatRef.current = null;
       }
     }
   });
 
-  // Listen for user interactions to immediately cancel any auto-camera movement
+  // Listen for user interactions to immediately cancel any auto-rotation
   useEffect(() => {
-    const cancelAutoMove = () => { targetCameraPosRef.current = null; };
+    const cancelAutoMove = () => { targetCubeQuatRef.current = null; };
     window.addEventListener('pointerdown', cancelAutoMove);
     window.addEventListener('touchstart', cancelAutoMove);
     return () => {

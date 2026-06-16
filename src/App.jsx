@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, ContactShadows } from '@react-three/drei';
+import { ContactShadows } from '@react-three/drei';
 import SidebarUI from './components/SidebarUI';
 import Cube3D from './components/Cube3D';
 import CameraScanner from './components/CameraScanner';
@@ -305,17 +305,7 @@ function App() {
             skipAnimation={skipAnimation}
             focusedFace={focusedFace}
           />
-          <OrbitControls 
-            makeDefault 
-            enablePan={false}
-            enableZoom={true}
-            minDistance={4}
-            maxDistance={25}
-            target={[0, 0, 0]}
-            rotateSpeed={1.5}
-            minPolarAngle={0.05} // Prevent exact mathematical gimbal lock at the poles
-            maxPolarAngle={Math.PI - 0.05}
-          />
+
         </Canvas>
         
         {showPreview && (
