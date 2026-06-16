@@ -151,28 +151,54 @@ const SidebarUI = ({
                   
                   {openFace === face && (
                     <div className="face-card-content" style={{ padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', borderTop: '1px solid var(--panel-border)', background: 'rgba(0,0,0,0.2)' }}>
-                      <div className="face-grid" style={{ width: '120px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-                        {cubeState[face].map((colorName, idx) => (
-                          <div
-                            key={`${face}-${idx}`}
-                            className="sticker"
-                            style={{ 
-                              width: '36px', height: '36px',
-                              background: COLORS[colorName] || COLORS.default,
-                              cursor: idx === 4 ? 'not-allowed' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: '4px'
-                            }}
-                            onClick={() => {
-                              if (idx !== 4) onStickerClick(face, idx);
-                            }}
-                          >
-                             {idx === 4 && <Lock size={14} color="rgba(0,0,0,0.5)" />}
+                      {(() => {
+                        const getAdjacentLabels = (f) => {
+                          switch(f) {
+                            case 'U': return { top: 'BACK', bottom: 'FRONT', left: 'LEFT', right: 'RIGHT' };
+                            case 'D': return { top: 'FRONT', bottom: 'BACK', left: 'LEFT', right: 'RIGHT' };
+                            case 'F': return { top: 'UP', bottom: 'DOWN', left: 'LEFT', right: 'RIGHT' };
+                            case 'B': return { top: 'UP', bottom: 'DOWN', left: 'RIGHT', right: 'LEFT' };
+                            case 'L': return { top: 'UP', bottom: 'DOWN', left: 'BACK', right: 'FRONT' };
+                            case 'R': return { top: 'UP', bottom: 'DOWN', left: 'FRONT', right: 'BACK' };
+                            default: return { top: '', bottom: '', left: '', right: '' };
+                          }
+                        };
+                        const adj = getAdjacentLabels(face);
+                        
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '1.5px' }}>{adj.top}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '1.5px', writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>{adj.left}</div>
+                              <div className="face-grid" style={{ width: '130px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
+                                {cubeState[face].map((colorName, idx) => (
+                                  <div
+                                    key={`${face}-${idx}`}
+                                    className="sticker"
+                                    style={{ 
+                                      width: '38px', height: '38px',
+                                      background: COLORS[colorName] || COLORS.default,
+                                      cursor: idx === 4 ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '4px',
+                                      border: idx === 4 ? '2px solid rgba(0,0,0,0.2)' : 'none'
+                                    }}
+                                    onClick={() => {
+                                      if (idx !== 4) onStickerClick(face, idx);
+                                    }}
+                                  >
+                                     {idx === 4 && <Lock size={16} color="rgba(0,0,0,0.5)" />}
+                                  </div>
+                                ))}
+                              </div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '1.5px', writingMode: 'vertical-rl' }}>{adj.right}</div>
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 800, letterSpacing: '1.5px' }}>{adj.bottom}</div>
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })()}
                       
                       <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
                         <button 
