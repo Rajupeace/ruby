@@ -31,6 +31,7 @@ body {
   font-family: 'Outfit', sans-serif;
   overflow: hidden;
   height: 100vh;
+  height: 100dvh; /* Modern mobile support to account for address bar */
   width: 100vw;
   display: flex;
   user-select: none; /* Make it feel like a desktop app */
@@ -774,6 +775,7 @@ h2.section-title::after {
     top: 0;
     left: 0;
     height: 100vh;
+    height: 100dvh;
     width: calc(100vw - 45px); /* Leave room for toggle button */
     max-width: 320px;
     z-index: 50; /* Over canvas and HUD */
