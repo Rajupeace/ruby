@@ -455,10 +455,25 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
   useFrame((state, delta) => {
     // Smoothly move camera if a face is focused and we aren't solving
     if (targetCameraPosRef.current && !isSolving) {
-      state.camera.position.lerp(targetCameraPosRef.current, 0.05);
+      state.camera.position.lerp(targetCameraPosRef.current, 0.08);
       state.camera.lookAt(0, 0, 0);
+      // Stop forcing the camera once it arrives, giving control back to the user
+      if (state.camera.position.distanceTo(targetCameraPosRef.current) < 0.1) {
+        targetCameraPosRef.current = null;
+      }
     }
   });
+
+  // Listen for user interactions to immediately cancel any auto-camera movement
+  useEffect(() => {
+    const cancelAutoMove = () => { targetCameraPosRef.current = null; };
+    window.addEventListener('pointerdown', cancelAutoMove);
+    window.addEventListener('touchstart', cancelAutoMove);
+    return () => {
+      window.removeEventListener('pointerdown', cancelAutoMove);
+      window.removeEventListener('touchstart', cancelAutoMove);
+    };
+  }, []);
 
   return <group ref={groupRef} />;
 };
