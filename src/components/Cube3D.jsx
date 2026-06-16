@@ -82,39 +82,35 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
   const highlightGroupRef = useRef(new THREE.Group());
   const { scene, gl, camera } = useThree();
   
-  // Custom drag rotation
-  useEffect(() => {
-    let isDragging = false;
-    let previousPosition = { x: 0, y: 0 };
+  // Custom drag rotation with Kinetic Momentum Easing
+  const dragState = useRef({
+    isDragging: false,
+    previousPosition: { x: 0, y: 0 },
+    velocity: { x: 0, y: 0 }
+  });
 
+  useEffect(() => {
     const onPointerDown = (e) => {
-      isDragging = true;
-      previousPosition = { x: e.clientX, y: e.clientY };
+      dragState.current.isDragging = true;
+      dragState.current.previousPosition = { x: e.clientX, y: e.clientY };
+      dragState.current.velocity = { x: 0, y: 0 }; // Instantly stop momentum when touched
     };
 
     const onPointerMove = (e) => {
-      if (!isDragging || !groupRef.current) return;
+      if (!dragState.current.isDragging) return;
       
-      const deltaX = e.clientX - previousPosition.x;
-      const deltaY = e.clientY - previousPosition.y;
-      previousPosition = { x: e.clientX, y: e.clientY };
-
-      const rotationSpeed = 0.008;
+      const deltaX = e.clientX - dragState.current.previousPosition.x;
+      const deltaY = e.clientY - dragState.current.previousPosition.y;
       
-      // Get the camera's exact UP and RIGHT vectors in world space
-      const right = new THREE.Vector3();
-      const up = new THREE.Vector3();
-      camera.matrixWorld.extractBasis(right, up, new THREE.Vector3());
-
-      // Dragging horizontally rotates around the camera's UP vector
-      groupRef.current.rotateOnWorldAxis(up, deltaX * rotationSpeed);
+      dragState.current.previousPosition = { x: e.clientX, y: e.clientY };
       
-      // Dragging vertically rotates around the camera's RIGHT vector
-      groupRef.current.rotateOnWorldAxis(right, deltaY * rotationSpeed);
+      // Update instantaneous velocity for momentum tracking
+      dragState.current.velocity.x = deltaX;
+      dragState.current.velocity.y = deltaY;
     };
 
     const onPointerUp = () => {
-      isDragging = false;
+      dragState.current.isDragging = false;
     };
 
     const dom = gl.domElement;
@@ -421,6 +417,27 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
 
   // Animation frame loop
   useFrame((state, delta) => {
+    // 1. Handle Drag and Kinetic Momentum Physics
+    const dState = dragState.current;
+    if (dState.isDragging || Math.abs(dState.velocity.x) > 0.01 || Math.abs(dState.velocity.y) > 0.01) {
+      if (groupRef.current) {
+        const right = new THREE.Vector3();
+        const up = new THREE.Vector3();
+        camera.matrixWorld.extractBasis(right, up, new THREE.Vector3());
+
+        const rotationSpeed = 0.008;
+        groupRef.current.rotateOnWorldAxis(up, dState.velocity.x * rotationSpeed);
+        groupRef.current.rotateOnWorldAxis(right, dState.velocity.y * rotationSpeed);
+      }
+      
+      // If user let go, smoothly dampen the velocity to simulate physical momentum friction
+      if (!dState.isDragging) {
+        dState.velocity.x *= 0.92;
+        dState.velocity.y *= 0.92;
+      }
+    }
+
+    // 2. Handle Solver Slice Animations
     if (!animatingRef.current) return;
 
     // Advance progress (0.8s base duration, adjusted by playback speed)
