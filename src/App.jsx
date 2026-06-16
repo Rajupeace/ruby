@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, ContactShadows } from '@react-three/drei';
+import { TrackballControls, ContactShadows } from '@react-three/drei';
 import SidebarUI from './components/SidebarUI';
 import Cube3D from './components/Cube3D';
 import CameraScanner from './components/CameraScanner';
@@ -305,13 +305,13 @@ function App() {
             skipAnimation={skipAnimation}
             focusedFace={focusedFace}
           />
-          <OrbitControls 
+          <TrackballControls 
             makeDefault 
-            enablePan={true} 
-            enableDamping={true} 
-            dampingFactor={0.05} 
-            rotateSpeed={0.8}
-            autoRotate={false}
+            panSpeed={1.0}
+            rotateSpeed={2.0}
+            zoomSpeed={1.2}
+            noPan={false}
+            noZoom={false}
             minDistance={4}
             maxDistance={25}
             target={[0, 0, 0]}
