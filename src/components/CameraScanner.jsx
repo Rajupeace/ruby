@@ -96,7 +96,16 @@ const CameraScanner = ({ onCapture, onClose, currentFaceToCapture }) => {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     
     if (ctx && canvas.width > 0) {
+      // If front camera, video is mirrored visually, so we mirror the canvas to match exactly
+      if (facingMode === 'user') {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      if (facingMode === 'user') {
+        ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+      }
+
       const newColors = gridPositions.map(pos => {
         const px = Math.floor(pos.x * canvas.width);
         const py = Math.floor(pos.y * canvas.height);
@@ -119,7 +128,7 @@ const CameraScanner = ({ onCapture, onClose, currentFaceToCapture }) => {
     }
     
     loopRef.current = requestAnimationFrame(scanRealTime);
-  }, []);
+  }, [facingMode]);
 
   useEffect(() => {
     if (!capturedColors) {
@@ -180,6 +189,7 @@ const CameraScanner = ({ onCapture, onClose, currentFaceToCapture }) => {
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
                 videoConstraints={{ facingMode, aspectRatio: 1 }}
+                mirrored={facingMode === 'user'}
                 onUserMediaError={handleUserMediaError}
                 className="webcam-view"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -192,6 +202,17 @@ const CameraScanner = ({ onCapture, onClose, currentFaceToCapture }) => {
               >
                 <RefreshCcw size={18} />
               </button>
+              
+              {/* Center Targeting Box */}
+              <div style={{
+                position: 'absolute',
+                top: '25%', left: '25%', width: '50%', height: '50%',
+                border: '2px dashed rgba(255, 255, 255, 0.6)',
+                borderRadius: '8px',
+                pointerEvents: 'none',
+                boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.3)', // dims everything outside the box
+              }} />
+
               <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
                 {gridPositions.map((pos, i) => {
                   const isCenter = i === 4;
