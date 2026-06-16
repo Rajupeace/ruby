@@ -100,8 +100,17 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
       previousPosition = { x: e.clientX, y: e.clientY };
 
       const rotationSpeed = 0.008;
-      groupRef.current.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), deltaX * rotationSpeed);
-      groupRef.current.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), deltaY * rotationSpeed);
+      
+      // Get the camera's exact UP and RIGHT vectors in world space
+      const right = new THREE.Vector3();
+      const up = new THREE.Vector3();
+      camera.matrixWorld.extractBasis(right, up, new THREE.Vector3());
+
+      // Dragging horizontally rotates around the camera's UP vector
+      groupRef.current.rotateOnWorldAxis(up, deltaX * rotationSpeed);
+      
+      // Dragging vertically rotates around the camera's RIGHT vector
+      groupRef.current.rotateOnWorldAxis(right, deltaY * rotationSpeed);
     };
 
     const onPointerUp = () => {
