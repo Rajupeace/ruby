@@ -266,6 +266,15 @@ function App() {
     }
   };
 
+  const handleApplyMove = (move) => {
+    if (isSolving) return;
+    setMoveSequence([move]);
+    setCurrentMoveIndex(0);
+    setSkipAnimation(false);
+    setAnimationDone(false);
+    setCubeStateHistory([cubeState]);
+  };
+
   return (
     <>
       <SidebarUI
@@ -304,6 +313,7 @@ function App() {
             rebuildKey={forceRender}
             skipAnimation={skipAnimation}
             focusedFace={focusedFace}
+            onApplyMove={handleApplyMove}
           />
 
         </Canvas>

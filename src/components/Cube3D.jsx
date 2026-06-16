@@ -75,13 +75,116 @@ const get2DCubeStateFrom3D = (cubies) => {
   return newState;
 };
 
-const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playbackSpeed = 1, onMoveComplete, rebuildKey, skipAnimation, focusedFace }) => {
+// Maps 2D screen drags on a 3D face into standard Rubik's cube notation
+const calculateSliceMove = (faceName, cubiePos, deltaX, deltaY, group, camera, width, height) => {
+  // 1. Get cube's local axes in world space
+  const localX = new THREE.Vector3(1, 0, 0).applyQuaternion(group.quaternion);
+  const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(group.quaternion);
+  const localZ = new THREE.Vector3(0, 0, 1).applyQuaternion(group.quaternion);
+
+  // 2. Project local axes to 2D screen vectors
+  const project = (vec3) => {
+    const v = vec3.clone().project(camera);
+    return new THREE.Vector2(v.x * width / 2, v.y * height / 2);
+  };
+  
+  const center2D = project(new THREE.Vector3(0, 0, 0));
+  const screenX = project(localX).sub(center2D).normalize();
+  const screenY = project(localY).sub(center2D).normalize();
+  const screenZ = project(localZ).sub(center2D).normalize();
+
+  // 3. User's 2D drag vector (Invert Y since screen Y goes down but 3D goes up)
+  const drag2D = new THREE.Vector2(deltaX, -deltaY).normalize();
+
+  // 4. Find which local axis the drag most closely aligns with
+  let validAxes = [];
+  let N = new THREE.Vector3();
+  if (faceName === 'R' || faceName === 'L') {
+    validAxes = [{ name: 'Y', vec: screenY }, { name: 'Z', vec: screenZ }];
+    N.set(faceName === 'R' ? 1 : -1, 0, 0);
+  } else if (faceName === 'U' || faceName === 'D') {
+    validAxes = [{ name: 'X', vec: screenX }, { name: 'Z', vec: screenZ }];
+    N.set(0, faceName === 'U' ? 1 : -1, 0);
+  } else {
+    validAxes = [{ name: 'X', vec: screenX }, { name: 'Y', vec: screenY }];
+    N.set(0, 0, faceName === 'F' ? 1 : -1);
+  }
+
+  let bestAxis = null;
+  let maxDot = -1;
+  let sign = 1;
+
+  validAxes.forEach(ax => {
+    const dot = drag2D.dot(ax.vec);
+    if (Math.abs(dot) > maxDot) {
+      maxDot = Math.abs(dot);
+      bestAxis = ax;
+      sign = dot > 0 ? 1 : -1;
+    }
+  });
+
+  if (!bestAxis || maxDot < 0.5) return null; // Diagonal/Ambiguous drag
+
+  // 5. Calculate Rotation Axis using Cross Product: A = D x N
+  const localD = new THREE.Vector3();
+  if (bestAxis.name === 'X') localD.set(sign, 0, 0);
+  if (bestAxis.name === 'Y') localD.set(0, sign, 0);
+  if (bestAxis.name === 'Z') localD.set(0, 0, sign);
+
+  const localA = new THREE.Vector3().crossVectors(N, localD);
+
+  // 6. Map the rotation vector to a standard Rubik's cube move
+  // Our rotVec signatures from standard notation:
+  const getMoveSignature = (moveStr) => {
+    let face = moveStr[0];
+    let isPrime = moveStr.includes("'");
+    let angle = isPrime ? 1 : -1;
+    let axis = new THREE.Vector3();
+    let sCoord = 0;
+    let sAxis = '';
+
+    if (face === 'R') { axis.set(1, 0, 0); sCoord = 1; sAxis = 'x'; }
+    else if (face === 'L') { axis.set(1, 0, 0); sCoord = -1; sAxis = 'x'; angle *= -1; }
+    else if (face === 'U') { axis.set(0, 1, 0); sCoord = 1; sAxis = 'y'; angle *= -1; }
+    else if (face === 'D') { axis.set(0, 1, 0); sCoord = -1; sAxis = 'y'; }
+    else if (face === 'F') { axis.set(0, 0, 1); sCoord = 1; sAxis = 'z'; angle *= -1; }
+    else if (face === 'B') { axis.set(0, 0, 1); sCoord = -1; sAxis = 'z'; }
+    else if (face === 'M') { axis.set(1, 0, 0); sCoord = 0; sAxis = 'x'; angle *= -1; }
+    else if (face === 'E') { axis.set(0, 1, 0); sCoord = 0; sAxis = 'y'; }
+    else if (face === 'S') { axis.set(0, 0, 1); sCoord = 0; sAxis = 'z'; angle *= -1; }
+    
+    return { move: moveStr, rotVec: axis.multiplyScalar(angle), sCoord, sAxis };
+  };
+
+  const allMoves = ['R',"R'",'L',"L'",'U',"U'",'D',"D'",'F',"F'",'B',"B'",'M',"M'",'E',"E'",'S',"S'"];
+  const signatures = allMoves.map(getMoveSignature);
+
+  // Find the matching move!
+  const match = signatures.find(m => {
+    return Math.round(cubiePos[m.sAxis]) === m.sCoord && 
+           Math.round(m.rotVec.x) === Math.round(localA.x) &&
+           Math.round(m.rotVec.y) === Math.round(localA.y) &&
+           Math.round(m.rotVec.z) === Math.round(localA.z);
+  });
+
+  return match ? match.move : null;
+};
+
+const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playbackSpeed = 1, onMoveComplete, rebuildKey, skipAnimation, focusedFace, onApplyMove }) => {
   const groupRef = useRef();
   const cubiesRef = useRef([]);
   const pivotRef = useRef(new THREE.Group());
   const highlightGroupRef = useRef(new THREE.Group());
   const { scene, gl, camera } = useThree();
-  
+  // Slice Drag State
+  const sliceDragState = useRef({
+    active: false,
+    faceName: null,
+    cubiePos: null,
+    startX: 0,
+    startY: 0
+  });
+
   // Custom drag rotation with Kinetic Momentum Easing
   const dragState = useRef({
     isDragging: false,
@@ -97,6 +200,7 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
     };
 
     const onPointerMove = (e) => {
+      if (sliceDragState.current.active) return; // Wait for pointerup to calculate slice swipe
       if (!dragState.current.isDragging) return;
       
       const deltaX = e.clientX - dragState.current.previousPosition.x;
@@ -109,8 +213,22 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
       dragState.current.velocity.y = deltaY;
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = (e) => {
       dragState.current.isDragging = false;
+      
+      if (sliceDragState.current.active) {
+        const state = sliceDragState.current;
+        const deltaX = e.clientX - state.startX;
+        const deltaY = e.clientY - state.startY;
+        
+        if (Math.hypot(deltaX, deltaY) > 30) {
+          const move = calculateSliceMove(state.faceName, state.cubiePos, deltaX, deltaY, groupRef.current, camera, window.innerWidth, window.innerHeight);
+          if (move && onApplyMove) {
+            onApplyMove(move);
+          }
+        }
+        sliceDragState.current.active = false;
+      }
     };
 
     const dom = gl.domElement;
@@ -138,6 +256,8 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
   const axisRef = useRef(new THREE.Vector3());
   const animatingRef = useRef(false);
   const animatingMoveIndexRef = useRef(-1);
+
+
 
   // Build the 27 cubies from cubeState
   useEffect(() => {
@@ -183,7 +303,22 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
               const target = sticker.position.clone().add(dir);
               sticker.lookAt(target);
               
-              sticker.userData = { colorName, axisIdx };
+              sticker.userData = { colorName, axisIdx, faceName, x, y, z };
+              
+              // Handle sticker click to initiate slice drag
+              sticker.onPointerDown = (e) => {
+                e.stopPropagation(); // Prevent global cube rotation
+                
+                sliceDragState.current.active = true;
+                sliceDragState.current.faceName = faceName;
+                sliceDragState.current.cubiePos = { x, y, z };
+                sliceDragState.current.startX = e.clientX;
+                sliceDragState.current.startY = e.clientY;
+                
+                // Stop any momentum
+                dragState.current.velocity = { x: 0, y: 0 };
+              };
+              
               mesh.add(sticker);
             }
           };
@@ -282,7 +417,7 @@ const Cube3D = ({ cubeState, moveSequence, currentMoveIndex, isSolving, playback
 
   // Start a move animation when currentMoveIndex changes
   useEffect(() => {
-    if (!isSolving || moveSequence.length === 0 || currentMoveIndex >= moveSequence.length) return;
+    if (moveSequence.length === 0 || currentMoveIndex >= moveSequence.length) return;
     
     // If skipAnimation is true, we already rebuilt the cube from history — do NOT animate
     if (skipAnimation) {
