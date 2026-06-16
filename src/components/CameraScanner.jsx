@@ -26,35 +26,39 @@ const rgbToHsl = (r, g, b) => {
 const identifyColorHSL = (r, g, b) => {
   const [h, s, l] = rgbToHsl(r, g, b);
   
-  // STRICT thresholds to prevent colour mixing
-  if (l < 12) return 'default'; // Too dark
-  
-  // White: very low saturation only
-  if (s < 20 && l > 55) return 'white';
-  if (l > 90 && s < 35) return 'white';
+  if (l < 15) return 'default'; // Pitch black
+  if (l > 85 || (s < 25 && l > 40)) return 'white'; // Washout or grey
+  if (s < 20) return 'default'; // Colorless
 
-  // Need minimum saturation to be a color
-  if (s < 20) return 'default';
+  const colors = [
+    { name: 'yellow', h: 60 },
+    { name: 'orange', h: 25 }, // Orange is often shifted down in webcams
+    { name: 'red', h: 0 },
+    { name: 'green', h: 120 },
+    { name: 'blue', h: 220 }
+  ];
 
-  // Yellow: bright, warm hue, HIGH lightness
-  if (h >= 45 && h < 70 && l > 40) return 'yellow';
-  
-  // Orange: warm hue, MEDIUM lightness (darker than yellow)
-  if (h >= 15 && h < 45 && l > 25) return 'orange';
-  
-  // Red: very low or very high hue
-  if ((h < 15 || h > 340) && s > 30) return 'red';
-  
-  // Green: cool hue  
-  if (h >= 70 && h < 165) return 'green';
-  
-  // Blue: cool hue
-  if (h >= 165 && h < 260) return 'blue';
-  
-  // Magenta/purple range -> red (webcam often shifts red)
-  if (h >= 260 && h <= 340 && s > 30) return 'red';
-  
-  return 'default';
+  let bestColor = 'default';
+  let minDist = Infinity;
+
+  for (const c of colors) {
+    // Circular hue distance
+    let dh = Math.min(Math.abs(h - c.h), 360 - Math.abs(h - c.h));
+    
+    // Webcam red sometimes appears as purple/magenta (h > 300)
+    if (c.name === 'red' && h > 300) dh = 360 - h; 
+
+    if (dh < minDist) {
+      minDist = dh;
+      bestColor = c.name;
+    }
+  }
+
+  // Extra threshold to separate red and orange, as they bleed easily
+  if (bestColor === 'red' && h > 15 && h < 45) return 'orange';
+  if (bestColor === 'orange' && h < 10) return 'red';
+
+  return bestColor;
 };
 
 const CameraScanner = ({ onCapture, onClose, currentFaceToCapture }) => {
